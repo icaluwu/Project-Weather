@@ -23,25 +23,39 @@ export default function App() {
   const { loading, err, points, meta } = useOpenMeteo();
   const [unit, setUnit] = useState<Unit>("C");
 
-  // Stats dari semua data (tanpa filter)
-  const fstats = useMemo(() => computeStats(points), [points]);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
-  // Label "Suhu Terkini" menggunakan tanggal & jam SEKARANG (waktu device)
+  const filteredPoints = useMemo(() => {
+    if (!points.length) return [];
+    if (!startDate && !endDate) return points;
+
+    const start = startDate ? new Date(startDate + "T00:00:00") : new Date(points[0].time);
+    const end = endDate ? new Date(endDate + "T23:59:59") : new Date(points[points.length - 1].time);
+
+    return points.filter((p) => {
+      const d = new Date(p.time);
+      return d >= start && d <= end;
+    });
+  }, [points, startDate, endDate]);
+
+  const fstats = useMemo(() => computeStats(filteredPoints), [filteredPoints]);
+
   const latestLabel = useMemo(() => {
-    const now = new Date();
-    const d = now.toLocaleDateString("id-ID", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-    const t = now.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    return `${d} pukul ${t}`;
-  }, []);
+    if (!fstats?.latest) return "-";
+    return fmtLong(fstats.latest.time);
+  }, [fstats]);
+
+  const setAug19to21 = () => {
+    const year = points.length ? new Date(points[0].time).getFullYear() : new Date().getFullYear();
+    setStartDate(`${year}-08-19`);
+    setEndDate(`${year}-08-21`);
+  };
+
+  const clearRange = () => {
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-5 md:px-6 py-6 md:py-8">
@@ -55,37 +69,68 @@ export default function App() {
         </p>
       </header>
 
-      {/* Controls sederhana */}
-      <section className="mb-4 md:mb-6 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-2xl border border-slate-800 overflow-hidden">
+      {/* Controls */}
+      <section className="mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Unit toggle + actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-2xl border border-slate-800 overflow-hidden">
+            <button
+              onClick={() => setUnit("C")}
+              className={`px-3 py-1 ${unit === "C" ? "bg-sky-500 text-black" : "bg-slate-900"}`}
+            >
+              °C
+            </button>
+            <button
+              onClick={() => setUnit("F")}
+              className={`px-3 py-1 ${unit === "F" ? "bg-sky-500 text-black" : "bg-slate-900"}`}
+            >
+              °F
+            </button>
+          </div>
           <button
-            onClick={() => setUnit("C")}
-            className={`px-3 py-1 ${unit === "C" ? "bg-sky-500 text-black" : "bg-slate-900"}`}
+            onClick={() => location.reload()}
+            className="px-3 py-1 rounded-2xl border border-slate-800 hover:bg-slate-900"
+            title="Refresh data"
           >
-            °C
-          </button>
-          <button
-            onClick={() => setUnit("F")}
-            className={`px-3 py-1 ${unit === "F" ? "bg-sky-500 text-black" : "bg-slate-900"}`}
-          >
-            °F
+            Refresh
           </button>
         </div>
-        <button
-          onClick={() => location.reload()}
-          className="px-3 py-1 rounded-2xl border border-slate-800 hover:bg-slate-900"
-          title="Refresh data"
-        >
-          Refresh
-        </button>
-        <a
-          className="px-3 py-1 rounded-2xl border border-slate-800 hover:bg-slate-900"
-          href="https://api.open-meteo.com/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open‑Meteo Docs
-        </a>
+
+        {/* Date range */}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-sm text-slate-400">Dari</label>
+          <input
+            type="date"
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 w-[150px] sm:w-auto"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <label className="text-sm text-slate-400">sampai</label>
+          <input
+            type="date"
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1 w-[150px] sm:w-auto"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+
+        {/* Preset & docs */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={clearRange}
+            className="px-3 py-1 rounded-2xl border border-slate-800 hover:bg-slate-900"
+          >
+            Reset
+          </button>
+          <a
+            className="px-3 py-1 rounded-2xl border border-slate-800 hover:bg-slate-900"
+            href="https://api.open-meteo.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open‑Meteo Docs
+          </a>
+        </div>
       </section>
 
       {loading && (
@@ -102,13 +147,9 @@ export default function App() {
 
       {!loading && !err && fstats && (
         <>
-          {/* Stats */}
+          {/* Stats: 2 cols on mobile, 4 on md+ */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
-            <StatCard
-              label="Suhu Terkini"
-              value={formatTemp(fstats.latest.tempC, unit)}
-              sub={latestLabel}
-            />
+            <StatCard label="Suhu Terkini" value={formatTemp(fstats.latest.tempC, unit)} sub={latestLabel} />
             <StatCard label="Rata-rata" value={formatTemp(fstats.avg, unit)} />
             <StatCard label="Maksimum" value={formatTemp(fstats.max, unit)} />
             <StatCard
@@ -117,20 +158,21 @@ export default function App() {
             />
           </div>
 
-          {/* Grafik */}
-          <TemperatureChart data={points} unit={unit} />
+          <TemperatureChart data={filteredPoints} unit={unit} />
 
-          {/* List mobile */}
+          {/* Data list (mobile) */}
           <div className="md:hidden mt-4 space-y-2">
-            {points.map((p) => (
+            {filteredPoints.map((p) => (
               <div key={p.time} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
                 <div className="text-sm text-slate-400">{fmtLong(p.time)}</div>
-                <div className="text-lg font-semibold">{formatTemp(p.tempC, unit)}</div>
+                <div className="text-lg font-semibold">
+                  {formatTemp(p.tempC, unit)}
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Tabel desktop */}
+          {/* Table (desktop) */}
           <div className="hidden md:block mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-900 sticky top-0">
@@ -140,7 +182,7 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {points.map((p) => (
+                {filteredPoints.map((p) => (
                   <tr key={p.time} className="odd:bg-slate-900/30">
                     <td className="px-4 py-2">{fmtLong(p.time)}</td>
                     <td className="px-4 py-2">{formatTemp(p.tempC, unit)}</td>
