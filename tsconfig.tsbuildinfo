@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/config.ts","./src/main.tsx","./src/components/StatCard.tsx","./src/components/TemperatureChart.tsx","./src/hooks/useOpenMeteo.ts","./src/utils/cache.ts","./src/utils/format.ts","./src/utils/temp.ts"],"version":"5.9.2"}
