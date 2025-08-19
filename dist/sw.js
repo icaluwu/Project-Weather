@@ -1,5 +1,5 @@
 // Simple SW: cache shell + last API success
-const CACHE_NAME = "pw-cache-v1";
+const CACHE_NAME = "pw-cache-v2";
 const CORE = [
   "%BASE_URL%",
   "%BASE_URL%index.html",
